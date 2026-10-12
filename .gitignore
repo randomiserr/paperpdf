@@ -1,0 +1,14 @@
+# Local runtime and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local settings and documents
+.env
+.env.*
+!.env.example
+*.pdf
+.DS_Store
+Thumbs.db
