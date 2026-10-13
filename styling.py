@@ -100,6 +100,62 @@ def rich_lines(runs, width):
     return lines
 
 
+def rich_positions(runs,width,size,spacing,align,point,full_metrics=False):
+    positions=[];baseline=point.y
+    for line in rich_lines(runs,width):
+        length=sum(r['font_object'].text_length(r['text'],fontsize=r['size']) for r in line)
+        x=point.x+(width-length)*(0 if align=='left' else .5 if align=='center' else 1)
+        for run in line:
+            font=run['font_object'];advance=font.text_length(run['text'],fontsize=run['size'])
+            divisor=1 if full_metrics else font.ascender-font.descender
+            target=fitz.Rect(x,baseline-run['size']*font.ascender/divisor,x+advance,baseline-run['size']*font.descender/divisor)
+            positions.append((run,x,baseline,advance,target));x+=advance
+        baseline+=max([size]+[r['size'] for r in line])*spacing
+    return positions
+
+
+def preserve_overlapping_characters(doc,page,source_rects,pick_font):
+    """Keep affected neighboring spans intact, including original glyph positions."""
+    rects=[fitz.Rect(rect) for rect in source_rects]
+    protected=[];remaining=[]
+    for block in page.get_text('rawdict')['blocks']:
+        for line in block.get('lines',[]):
+            angle=math.degrees(math.atan2(-line['dir'][1],line['dir'][0]))
+            for span in line['spans']:
+                if any(all(abs(a-b)<.01 for a,b in zip(span['bbox'],rect)) for rect in source_rects):
+                    continue
+                remaining.append((span,angle))
+    while remaining:
+        affected=[item for item in remaining if any((fitz.Rect(item[0]['bbox']) & rect).get_area()>0 for rect in rects)]
+        if not affected:break
+        for span,angle in affected:
+            remaining.remove((span,angle));rects.append(fitz.Rect(span['bbox']))
+            alias,font,_=pick_font(doc,page,span['font'],''.join(char['c'] for char in span['chars']))
+            rgb=tuple(((span['color']>>shift)&255)/255 for shift in (16,8,0))
+            for char in span['chars']:
+                protected.append((char,span['size'],alias,font,rgb,angle,span.get('alpha',255)/255))
+    return protected,rects
+
+
+def remove_text_source(doc,page,source,pick_font):
+    """Remove the selected paragraph while retaining overlapping neighboring text."""
+    protected,rects=preserve_overlapping_characters(doc,page,source['rects'],pick_font)
+    source_box=fitz.Rect(source['bbox'])+(-3,-3,3,3)
+    if any(run.get('underline') for run in source.get('runs',[])):
+        for annotation in list(page.annots() or []):
+            if annotation.type[1]=='Underline' and source_box.contains(annotation.rect):
+                page.delete_annot(annotation)
+    for rect in rects:
+        page.add_redact_annot(rect,fill=False,cross_out=False)
+    page.apply_redactions(images=0,graphics=0)
+    for char,char_size,alias,font,rgb,angle,opacity in protected:
+        if alias.startswith('EditFont'):
+            page.insert_font(fontname=alias,fontbuffer=font.buffer)
+        origin=fitz.Point(char['origin'])
+        page.insert_text(origin,char['c'],fontname=alias,fontsize=char_size,color=rgb,
+                         morph=(origin,fitz.Matrix(angle)) if abs(angle)>.001 else None,fill_opacity=opacity)
+
+
 def write_rich(doc,page,source,request,pick_font,color,all_spans):
     size = float(request.get('size',source['size'] if source else 14))
     width = float(request['width'])
@@ -107,7 +163,10 @@ def write_rich(doc,page,source,request,pick_font,color,all_spans):
     align = request.get('align','left')
     if not all(math.isfinite(v) for v in (size,width,spacing)) or not 4<=size<=144 or width<5 or not 1<=spacing<=3 or align not in ('left','center','right'):
         raise ValueError('Choose a valid font size, width, alignment, and line spacing.')
-    point = fitz.Point(source['origin'] if source else request['point'])
+    point = fitz.Point(request.get('point',source['origin'] if source else None))
+    if not all(math.isfinite(v) for v in point):
+        raise ValueError('Choose a valid text position.')
+    auto_layout=request.get('auto_layout') is True
     default_font = request.get('font',source['font'] if source else 'Arial')
     raw = request.get('runs')
     if raw is None:
@@ -137,37 +196,42 @@ def write_rich(doc,page,source,request,pick_font,color,all_spans):
             warnings.add('A compatible font was used where the original font or style was unavailable.')
     for run in prepared:
         value=fonts[run['key']];run.update(alias=value['alias'],font_object=value['font'])
-    lines=rich_lines(prepared,width)
     source_rects=source['rects'] if source else []
-    others=[s for s in all_spans(page) if not any(all(abs(a-b)<.01 for a,b in zip(s['bbox'],r)) for r in source_rects)]
-    positions=[];baseline=point.y
-    for i,line in enumerate(lines):
-        length=sum(r['font_object'].text_length(r['text'],fontsize=r['size']) for r in line)
-        x=point.x+(width-length)*(0 if align=='left' else .5 if align=='center' else 1)
-        for run in line:
-            font=run['font_object'];advance=font.text_length(run['text'],fontsize=run['size'])
-            asc=font.ascender/(font.ascender-font.descender);desc=-font.descender/(font.ascender-font.descender)
-            target=fitz.Rect(x,baseline-run['size']*asc,x+advance,baseline+run['size']*desc)
+    if auto_layout:
+        margin=min(2,page.rect.width/8,page.rect.height/8)
+        available=page.rect.width-margin*2
+        glyph_width=max([5]+[run['font_object'].text_length(char,fontsize=run['size']) for run in prepared for char in run['text'] if not char.isspace()])
+        width=min(available,max(width,glyph_width+.01))
+        point.x=max(page.rect.x0+margin,min(point.x,page.rect.x1-margin-width))
+        positions=rich_positions(prepared,width,size,spacing,align,point,True)
+        if positions:
+            bounds=fitz.Rect(positions[0][4])
+            for item in positions[1:]:bounds|=item[4]
+            if bounds.height>page.rect.height-margin*2 and width<available:
+                width=available;point.x=page.rect.x0+margin
+                positions=rich_positions(prepared,width,size,spacing,align,point,True)
+                bounds=fitz.Rect(positions[0][4])
+                for item in positions[1:]:bounds|=item[4]
+            # Move the selected text into the page; never shrink the requested type or move neighbors.
+            dx=max(0,page.rect.x0+margin-bounds.x0)-max(0,bounds.x1-page.rect.x1+margin)
+            dy=page.rect.y0+margin-bounds.y0 if bounds.height>page.rect.height-margin*2 else max(0,page.rect.y0+margin-bounds.y0)-max(0,bounds.y1-page.rect.y1+margin)
+            positions=[(run,x+dx,y+dy,advance,target+(dx,dy,dx,dy)) for run,x,y,advance,target in positions]
+    else:
+        positions=rich_positions(prepared,width,size,spacing,align,point)
+        others=[s for s in all_spans(page) if not any(all(abs(a-b)<.01 for a,b in zip(s['bbox'],r)) for r in source_rects)]
+        for run,x,baseline,advance,target in positions:
             if not page.rect.contains(target):
                 raise ValueError('The text reaches the page edge. Widen the block, reduce the size, or shorten the text.')
             for other in others:
                 overlap=target & fitz.Rect(other['bbox'])
                 if not overlap.is_empty and overlap.width>1 and overlap.height>run['size']*.15:
                     raise ValueError('The paragraph reaches another text block. Widen it, reduce the size, or shorten the text.')
-            positions.append((run,x,baseline,advance));x+=advance
-        baseline+=max([size]+[r['size'] for r in line])*spacing
     if source:
-        source_box=fitz.Rect(source['bbox'])+(-3,-3,3,3)
-        for annotation in list(page.annots() or []):
-            if annotation.type[1]=='Underline' and source_box.contains(annotation.rect):
-                page.delete_annot(annotation)
-        for rect in source_rects:
-            page.add_redact_annot(fitz.Rect(rect),fill=False,cross_out=False)
-        page.apply_redactions(images=0,graphics=0)
+        remove_text_source(doc,page,source,pick_font)
     for value in fonts.values():
         if value['alias'].startswith('EditFont'):
             page.insert_font(fontname=value['alias'],fontbuffer=value['font'].buffer)
-    for run,x,y,advance in positions:
+    for run,x,y,advance,_ in positions:
         page.insert_text((x,y),run['text'],fontname=run['alias'],fontsize=run['size'],color=run['color'])
         if run['underline'] and run['text'].strip():
             font=run['font_object'];asc=font.ascender/(font.ascender-font.descender);desc=-font.descender/(font.ascender-font.descender)

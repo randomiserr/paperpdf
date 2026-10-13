@@ -11,8 +11,11 @@ import sys
 import os
 import statistics
 import math
-from styling import flags, styled_font, write_rich, document_style
+from styling import flags, styled_font, write_rich, document_style, remove_text_source
 from objects import list_objects, edit_objects, render_objects
+from saving import show_save_dialog
+from basic_actions import find_text, replace_text, redact_pdf, add_date, add_signature
+from signatures import load_signature, signature_info, save_signature, clear_signature
 
 try:
     import pymupdf as fitz
@@ -24,6 +27,7 @@ ROOT = Path(__file__).parent
 TOKEN = secrets.token_urlsafe(32)
 DOCS = {}
 LOCK = threading.RLock()
+SAVE_LOCK = threading.Lock()
 LIMIT = 50 * 1024 * 1024
 fitz.TOOLS.set_small_glyph_heights(True)
 
@@ -168,6 +172,15 @@ def pick_font(doc, page, name, text):
 
 
 def edit_pdf(data, request):
+    action = request.get('action')
+    if action == 'replace_text':
+        return replace_text(data, request, pick_font)
+    if action == 'redact':
+        return redact_pdf(data, request)
+    if action == 'date':
+        return add_date(data, request, pick_font, color)
+    if action == 'signature':
+        return add_signature(data, request, load_signature())
     if request.get('action')=='objects':
         return edit_objects(data,request,color)
     if request.get('action')=='document_style':
@@ -247,6 +260,10 @@ def edit_pdf(data, request):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        # Render URLs contain the session token. Never log request URLs or contents.
+        pass
+
     def respond(self, body, content_type='application/json', status=200, headers=None):
         if isinstance(body, (dict, list)):
             body = json.dumps(body).encode()
@@ -269,17 +286,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({'error': 'Local access only.'}, status=403)
         url = urlparse(self.path)
         try:
-            if url.path in ('/', '/app.js', '/objects.js', '/style.css'):
+            if url.path in ('/', '/app.js', '/objects.js', '/basic-tools.js', '/style.css', '/paper-grain.svg'):
                 filename = 'index.html' if url.path == '/' else url.path[1:]
                 content = (ROOT/'static'/filename).read_bytes()
                 if filename == 'index.html':
                     content = content.replace(b'__TOKEN__', TOKEN.encode())
-                return self.respond(content, {'index.html':'text/html; charset=utf-8', 'app.js':'text/javascript; charset=utf-8', 'objects.js':'text/javascript; charset=utf-8', 'style.css':'text/css; charset=utf-8'}[filename])
+                return self.respond(content, {'index.html':'text/html; charset=utf-8', 'app.js':'text/javascript; charset=utf-8', 'objects.js':'text/javascript; charset=utf-8', 'basic-tools.js':'text/javascript; charset=utf-8', 'style.css':'text/css; charset=utf-8', 'paper-grain.svg':'image/svg+xml'}[filename])
             if url.path == '/health':
                 return self.respond({'ok': True})
             query = parse_qs(url.query)
             if self.headers.get('X-Editor-Token') != TOKEN and query.get('token', [''])[0] != TOKEN:
                 return self.respond({'error': 'Reload the editor to reconnect.'}, status=403)
+            if url.path == '/api/signature':
+                with LOCK:
+                    return self.respond(signature_info())
             with LOCK:
                 record = DOCS[query['id'][0]]
                 record['seen'] = time.time()
@@ -294,9 +314,7 @@ class Handler(BaseHTTPRequestHandler):
                         page = doc[int(query['page'][0])]
                         if 'exclude' in query:
                             block = text_blocks(page)[int(query['exclude'][0])]
-                            for rect in block['rects']:
-                                page.add_redact_annot(fitz.Rect(rect),fill=False,cross_out=False)
-                            page.apply_redactions(images=0,graphics=0)
+                            remove_text_source(doc,page,block,pick_font)
                         scale = min(scale, 2400/max(page.rect.width, page.rect.height))
                         return self.respond(page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False).tobytes('png'), 'image/png')
                 if url.path == '/api/object':
@@ -335,6 +353,26 @@ class Handler(BaseHTTPRequestHandler):
             if length > LIMIT:
                 return self.respond({'error': 'Choose a PDF smaller than 50 MB.'}, status=413)
             body = self.rfile.read(length)
+            if self.path == '/api/signature':
+                request = json.loads(body)
+                with LOCK:
+                    return self.respond(clear_signature() if request.get('clear') is True else save_signature(request))
+            if self.path == '/api/save':
+                request = json.loads(body)
+                with LOCK:
+                    record = DOCS[request['id']]
+                    if request.get('revision') != record['revision']:
+                        raise ValueError('The document changed. Reload this page before saving again.')
+                    record['seen'] = time.time()
+                    data, revision = record['data'], record['revision']
+                    name = Path(record['name']).stem + '-edited.pdf'
+                if not SAVE_LOCK.acquire(blocking=False):
+                    raise ValueError('A Save as dialog is already open. Finish or cancel it first.')
+                try:
+                    result = show_save_dialog(data, name)
+                finally:
+                    SAVE_LOCK.release()
+                return self.respond(result | {'revision': revision})
             with LOCK:
                 if self.path == '/api/open':
                     # Expire inactive documents rather than retaining files on disk.
@@ -366,6 +404,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond({'ok': True})
                 if request.get('revision') != record['revision']:
                     raise ValueError('The document changed. Reload this page before editing again.')
+                if self.path == '/api/find':
+                    return self.respond(find_text(record['data'], request) | {'revision': record['revision']})
+                response_page = request.get('page', 0)
+                with fitz.open(stream=record['data'], filetype='pdf') as current:
+                    if type(response_page) is not int or not 0 <= response_page < len(current):
+                        raise ValueError('Choose a valid page.')
                 warning = ''
                 if self.path == '/api/edit':
                     data, warning = edit_pdf(record['data'], request)
@@ -382,7 +426,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     raise ValueError('Unknown request.')
                 record['revision'] += 1
-                return self.respond(metadata(record, int(request.get('page', 0))) | {'warning': warning, 'selection': request.get('_result_objects',[])})
+                return self.respond(metadata(record, response_page) | {'warning': warning, 'selection': request.get('_result_objects',[]), 'changed': request.get('_result_count', 1)})
         except Exception as error:
             self.respond({'error': str(error) if not isinstance(error, KeyError) else 'Document unavailable. Please open it again.'}, status=400)
 

@@ -1,31 +1,89 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="editor-token" content="__TOKEN__"><title>Paperwork — PDF editor</title><link rel="stylesheet" href="/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="editor-token" content="__TOKEN__"><meta name="description" content="Edit PDF text, images, and layouts on your computer. Save an edited copy wherever you choose."><meta name="robots" content="noindex,nofollow"><title>Paperwork · Edit PDFs locally</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<header><a class="brand" href="/" aria-label="Paperwork home"><span class="brand-mark">p.</span> paperwork<span class="badge">PDF EDITOR</span></a><div class="file-meta"><strong id="filename">Your next draft starts here</strong><span id="file-status">A little less paperwork.</span></div><div class="header-actions"><button id="open-btn">Open PDF</button><button id="download" class="primary" disabled>Download PDF <span aria-hidden="true">↗</span></button></div></header>
-<main>
-<aside class="pages-sidebar"><div class="sidebar-heading">PAGES <span id="page-count">—</span></div><div id="thumbnails"><div class="sidebar-empty">Your pages will<br>appear here.</div></div><div class="local-label"><span></span> Files stay on this computer</div></aside>
+<a class="skip-link" href="#main-content">Skip to content</a>
+<header><a class="brand" href="/" aria-label="Paperwork home"><span class="brand-mark">p.</span> paperwork</a><nav class="landing-nav" aria-label="About Paperwork"><a href="#editable">What’s editable</a><a href="#agents">For agents</a><a href="#run-locally">Run locally</a></nav><div class="file-meta"><strong id="filename"></strong><span id="file-status" role="status"></span></div><div class="header-actions"><button id="open-btn">Open PDF</button><button id="download" class="primary" disabled>Save PDF…</button></div></header>
+<main id="main-content" tabindex="-1">
+<aside class="pages-sidebar"><div class="sidebar-heading">Pages <span id="page-count"></span></div><div id="thumbnails"></div><div class="local-label"><span></span> Files stay on this computer</div></aside>
 <section class="workspace">
-<nav class="toolbar" aria-label="PDF tools"><div class="tool-group" id="tools"><button data-tool="select" class="active" title="Select text, images, or artwork" aria-label="Select"><b>↖</b><span>Select</span></button><button data-tool="text" title="Add text"><b>T</b><span>Add text</span></button><button data-tool="objects" title="Select, move, resize, and style PDF artwork"><b>◇</b><span>Objects</span></button><button data-tool="image" title="Add an image"><b>▧</b><span>Image</span></button><button data-tool="highlight" title="Highlight an area"><b>▰</b><span>Highlight</span></button><button data-tool="note" title="Add a comment"><b>▤</b><span>Note</span></button><button data-tool="appearance" title="Style pages and the whole document"><b>◐</b><span>Appearance</span></button></div><div class="history"><button id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><b>↶</b><span>Undo</span></button><button id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled><b>↷</b><span>Redo</span></button></div></nav>
+<nav class="toolbar" aria-label="PDF tools"><div class="tool-group" id="tools"><button data-tool="select" class="active" title="Select text, images, or artwork" aria-label="Select"><b>↖</b><span>Select</span></button><button data-tool="text" title="Add text"><b>T</b><span>Add text</span></button><button data-tool="objects" title="Select, move, resize, and style PDF artwork"><b>◇</b><span>Objects</span></button><button data-tool="image" title="Add an image"><b>▧</b><span>Image</span></button><button data-tool="highlight" title="Highlight an area"><b>▰</b><span>Highlight</span></button><button data-tool="note" title="Add a comment"><b>▤</b><span>Note</span></button><button aria-label="Find &amp; redact" data-tool="find" title="Find, replace, or securely redact exact text"><b>⌕</b><span>Find &amp; redact</span></button><button aria-label="Signature" data-tool="signature" title="Add your saved signature"><b>✎</b><span>Signature</span></button><button aria-label="Date" data-tool="date" title="Add today’s date"><b>▦</b><span>Date</span></button><button data-tool="appearance" title="Style pages and the whole document"><b>◐</b><span>Appearance</span></button></div><div class="history"><button id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><b>↶</b><span>Undo</span></button><button id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled><b>↷</b><span>Redo</span></button></div></nav>
 <div class="canvas-scroll" id="canvas-scroll">
-<div id="welcome"><div class="paper-symbol" aria-hidden="true"><div></div><div></div><div></div><span>✎</span></div><p class="eyebrow">MAKE IT YOURS</p><h1>Small changes.<br>Finished documents.</h1><p class="intro">Fix a line, add an image, leave a note.<br>Give your PDF its next draft.</p><button id="choose-file" class="primary large">Open a PDF <span>＋</span></button><p class="drop-hint">or drop a file anywhere · up to 50 MB</p><div class="feature-row"><span>Click to edit</span><i>·</i><span>Undo any change</span><i>·</i><span>Save a copy</span></div></div>
-<div id="document-stage" hidden><div id="page-surface"><img id="page-image" alt="Current PDF page" draggable="false"><div id="interaction-layer"></div><div id="selection-box" hidden></div></div></div>
-</div>
-<footer><span id="hint">Open a PDF to get started</span><div id="page-controls"><button id="prev" aria-label="Previous page" disabled>‹</button><span id="page-indicator">— / —</span><button id="next" aria-label="Next page" disabled>›</button><span class="divider"></span><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-label" title="Fit page width">100%</button><button id="zoom-in" aria-label="Zoom in">＋</button></div></footer>
+<section id="welcome" aria-labelledby="welcome-title">
+  <div class="hero-copy">
+    <h1 id="welcome-title">Edit PDFs.<br><span>Right on<br class="mobile-break"> the page.</span></h1>
+    <p class="hero-description">Change text, add images, and adjust the layout.<br class="desktop-break"> Save a copy wherever you choose.</p>
+    <button id="choose-file" class="primary large">Open PDF <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <p class="drop-hint">or drop a PDF here · Up to 50 MB</p>
+    <p class="hero-local"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>Your files stay on this computer.</p>
+  </div>
+  <div class="hero-preview" aria-hidden="true">
+    <div class="preview-sheet preview-sheet-back"></div>
+    <div class="preview-sheet">
+      <div class="preview-document-meta"><span>Project notes</span><span>01</span></div>
+      <div class="preview-selection">
+        <div class="preview-format"><span>T</span><span>36</span><strong>B</strong><span>A<span class="preview-color"></span></span></div>
+        <div class="preview-title">The spring<br>workshop.</div>
+        <i class="preview-corner nw"></i><i class="preview-corner ne"></i><i class="preview-corner sw"></i><i class="preview-corner se"></i>
+        <svg class="preview-cursor" viewBox="0 0 28 34"><path d="M3 2v25l6-6 5 10 5-2-5-10h10Z"/></svg>
+      </div>
+      <p class="preview-subtitle">A day to sketch, share, and make.</p>
+      <div class="preview-art"><svg viewBox="0 0 300 140"><circle cx="240" cy="40" r="24"/><path d="M0 140V94c45-60 82-51 132-12s107 32 168-16v74Z"/><path d="M0 140v-15c59-30 108-25 152 1s91 27 148-2v16Z"/></svg></div>
+      <div class="preview-lines"><span></span><span></span><span></span></div>
+      <div class="preview-document-footer"><span>April 24</span><span>Notes &amp; ideas</span></div>
+    </div>
+  </div>
 </section>
-<aside class="inspector"><div class="sidebar-heading">TOOL SETTINGS</div><div class="inspector-body"><span class="tool-tag" id="tool-tag">EDIT TEXT</span><h2 id="inspector-title">The finishing touches.</h2><p id="instructions">Open a document, then click a line of text to make a change.</p>
+<div class="landing-details">
+  <section id="editable" class="editable-section" aria-labelledby="editable-title">
+    <h2 id="editable-title">What’s editable</h2>
+    <dl class="editable-grid">
+      <div><dt>Text &amp; typography</dt><dd>Rewrite paragraphs. Change fonts, size, color, and emphasis. Move or resize the text box.</dd></div>
+      <div><dt>Images &amp; artwork</dt><dd>Add, move, and resize images. Recolor and arrange supported vector shapes and grouped artwork.</dd></div>
+      <div><dt>Page appearance</dt><dd>Change solid backgrounds, text color, and fonts on one page or across the document.</dd></div>
+      <div><dt>Highlights &amp; notes</dt><dd>Mark an area or leave a comment. Undo and redo edits before saving your copy.</dd></div>
+    </dl>
+    <p class="editing-scope">Text wraps within its paragraph; surrounding content stays in place. Scanned pages accept new text and images, but their existing text isn’t selectable.</p>
+  </section>
+  <div class="landing-bottom">
+    <section id="agents" class="landing-panel agent-panel" aria-labelledby="agents-title">
+      <h2 id="agents-title">Agent friendly</h2>
+      <p>A documented codebase for coding agents, with callable PDF editing operations and a local HTTP API.</p>
+      <ul class="agent-guidance">
+        <li><code>AGENTS.md</code><span>Setup commands, editing rules, and verification requirements.</span></li>
+        <li><code>docs/architecture.md</code><span>The module map and the path from an edit to a PDF.</span></li>
+        <li><code>python verify.py</code><span>One command for syntax, dependency, PDF, and interface regressions.</span></li>
+      </ul>
+      <p class="agent-revisions">Edit requests include a document revision. Stale requests are rejected before they change the PDF.</p>
+    </section>
+    <section id="run-locally" class="landing-panel run-panel" aria-labelledby="run-title">
+      <h2 id="run-title">Run it locally</h2>
+      <p>Install Python 3.11 or newer, then open the project folder.</p>
+      <div class="windows-start"><span class="setup-label">On Windows</span><p>Double-click <code>start.bat</code>. It creates the environment and installs dependencies on the first run.</p></div>
+      <div class="terminal-start"><span class="setup-label">Or use the terminal</span><pre aria-label="Startup commands"><code>python -m pip install -r requirements.txt
+python server.py</code></pre></div>
+      <p class="startup-address">Open <a href="http://127.0.0.1:8765/">127.0.0.1:8765</a> in your browser and keep the terminal open.</p>
+      <p class="session-note">Save before stopping the server. Documents and undo history are kept in memory.</p>
+    </section>
+  </div>
+</div>
+<div id="document-stage" hidden><div id="page-surface"><canvas id="page-image" role="img" aria-label="Current PDF page"></canvas><div id="interaction-layer"></div><div id="selection-box" hidden></div><div id="edit-progress" role="status" hidden><span class="activity-spinner" aria-hidden="true"></span><span class="sr-only">Updating page</span></div></div></div>
+</div>
+<footer><span id="hint"></span><div id="page-controls"><span id="save-status" role="status" hidden><span class="activity-spinner" aria-hidden="true"></span><span id="activity-label" class="sr-only">Updating page</span></span><button id="prev" aria-label="Previous page" disabled>‹</button><span id="page-indicator">— / —</span><button id="next" aria-label="Next page" disabled>›</button><span class="divider"></span><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-label" title="Fit page width">100%</button><button id="zoom-in" aria-label="Zoom in">＋</button></div></footer>
+</section>
+<aside class="inspector" aria-label="Tool settings"><div class="inspector-body"><h2 id="inspector-title">Selection</h2><p id="instructions" hidden></p>
 <div id="inline-settings" hidden>
-<p id="text-scope" class="selection-scope">Styling the whole paragraph</p>
+<p id="text-scope" class="selection-scope">Whole paragraph</p>
 <label for="inline-family">Font</label><select id="inline-family"><option value="original">Original PDF font</option><option>Arial</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Segoe UI</option></select>
 <div class="format-buttons" role="group" aria-label="Text formatting"><button type="button" id="format-bold" aria-label="Bold" aria-pressed="false"><strong>B</strong></button><button type="button" id="format-italic" aria-label="Italic" aria-pressed="false"><em>I</em></button><button type="button" id="format-underline" aria-label="Underline" aria-pressed="false"><u>U</u></button></div>
-<div class="two-cols"><div><label for="inline-size">Text size</label><input id="inline-size" type="number" min="4" max="144" step="0.1" value="14"></div><div><label for="inline-color">Text color</label><input id="inline-color" type="color" value="#242a28"></div></div>
+<div class="two-cols"><div><label for="inline-size">Text size</label><input id="inline-size" type="number" min="4" max="144" step="1" value="14"></div><div><label for="inline-color">Text color</label><input id="inline-color" type="color" value="#242a28"></div></div>
 <div class="two-cols"><div><label for="inline-align">Alignment</label><select id="inline-align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div><div><label for="inline-spacing">Line spacing</label><select id="inline-spacing"><option value="1.15">1.15</option><option value="1.35">1.35</option><option value="1.5">1.5</option><option value="2">2</option></select></div></div>
-<button id="delete-text" type="button" class="full danger" hidden>Delete text box</button><p id="inline-font" class="small"></p><p class="small">Select words to style them, or leave the selection empty to style the paragraph. Drag its corner to change the wrapping width.</p><p class="small"><strong>Ctrl + Enter</strong> finishes · <strong>Escape</strong> cancels</p></div>
+<button id="delete-text" type="button" class="full danger" hidden>Delete text box</button><p id="inline-font" class="small"></p><p class="small">Select words to format them. Drag corners to resize, or the grip to move.</p></div>
 <div id="appearance-options" hidden><label for="appearance-scope">Apply to</label><select id="appearance-scope"><option value="all">Whole document</option><option value="page">Current page</option></select>
 <div class="appearance-section"><label class="check-label"><input id="enable-background" type="checkbox" checked> Page background</label><input id="page-background" type="color" value="#f5f1e8" aria-label="Page background color"><div class="swatches" aria-label="Background presets"><button type="button" data-bg="#ffffff" style="--swatch:#ffffff" aria-label="White background"></button><button type="button" data-bg="#f5f1e8" style="--swatch:#f5f1e8" aria-label="Ivory background"></button><button type="button" data-bg="#e9efe8" style="--swatch:#e9efe8" aria-label="Sage background"></button><button type="button" data-bg="#e9eff7" style="--swatch:#e9eff7" aria-label="Blue background"></button><button type="button" data-bg="#203039" style="--swatch:#203039" aria-label="Dark background"></button></div></div>
 <div class="appearance-section"><label class="check-label"><input id="enable-document-color" type="checkbox"> Text color</label><input id="document-color" type="color" value="#1c3039" aria-label="Document text color"></div>
-<div class="appearance-section"><label class="check-label"><input id="enable-document-font" type="checkbox"> Font throughout</label><select id="document-family" aria-label="Document font"><option>Arial</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Segoe UI</option></select></div>
-<button id="apply-appearance" class="primary full" disabled>Apply appearance</button><p class="small">Changes are saved in your PDF. Font changes keep heading sizes and bold/italic styles; wider text fits its original space. Undo restores the previous appearance.</p><p class="small">Background controls change solid page fills. Image backgrounds need a separate image edit.</p></div>
+<div class="appearance-section"><label class="check-label"><input id="enable-document-font" type="checkbox"> Font</label><select id="document-family" aria-label="Document font"><option>Arial</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Segoe UI</option></select></div>
+<button id="apply-appearance" class="primary full" disabled>Apply appearance</button><p class="small">Background color affects solid fills only. Use Objects to edit images.</p></div>
 <form id="edit-form" hidden><label for="text-input" id="text-label">Comment</label><textarea id="text-input" rows="4" spellcheck="true" placeholder="Write a comment…"></textarea><div id="text-options" hidden><input id="font-size" type="number" value="14"><input id="text-color" type="color" value="#242a28"><p id="font-info"></p></div><button class="primary full" type="submit" id="apply">Add note</button><button type="button" class="full quiet" id="cancel-edit">Cancel</button></form>
 <div id="objects-options" hidden>
 <div id="object-settings" hidden><p id="object-summary" class="selection-scope"></p>
@@ -35,11 +93,30 @@
 <div id="object-colors"><div class="two-cols"><div><label for="object-fill">Fill color</label><input id="object-fill" type="color" value="#102b3a"></div><div><label for="object-stroke">Stroke color</label><input id="object-stroke" type="color" value="#6d7d80"></div></div><button id="apply-object-color" class="full">Apply colors</button></div>
 <div class="object-order"><button id="object-front" title="Above all page content">Bring to front</button><button id="object-back" title="Below all page content">Send to back</button></div><div class="object-order"><button id="object-delete" class="danger">Delete object</button><button id="clear-objects">Deselect</button></div><p id="object-style-note" class="small"></p></div>
 <label class="check-label object-check"><input id="object-snap" type="checkbox" checked> Snap to objects &amp; text blocks</label>
-<div id="object-library"><div class="layer-heading">PAGE OBJECTS <span id="object-count">0</span></div><select id="object-filter" aria-label="Filter page objects"><option value="all">All images &amp; artwork</option><option value="image">Images</option><option value="vector">Vectors</option><option value="background">Backgrounds</option><option value="artwork">Grouped artwork</option></select><div id="object-list" aria-label="Page object layers"></div><p class="small">Frontmost objects appear first. Shift-click to select multiple paths. Images and vectors can overlap text; text does not automatically flow around them.</p></div></div>
-<div id="image-options" hidden><button id="choose-image" class="full">Choose an image</button><img id="image-preview" alt="Selected image preview" hidden><label for="image-width">Width on page (pt)</label><input id="image-width" type="number" min="10" max="1000" value="180"><p class="small">PNG or JPEG. Click the page to place it. The original proportions are kept. After placing it, drag its handles in Objects to resize or move it.</p></div>
-<div id="highlight-options" hidden><label for="highlight-color">Highlight color</label><input id="highlight-color" type="color" value="#f4c84b"><p class="small">Drag over the area you want to highlight.</p></div>
-<div class="tip-card" id="tip"><span>GOOD TO KNOW</span><p>Your original stays untouched. Download a new copy when you’re done.</p></div><div id="scan-notice" class="scan-notice" hidden>This page has no selectable text. You can still add text, images, and annotations.</div></div><div class="inspector-bottom">A quieter way to work with PDFs.</div></aside>
+<div id="object-library"><div class="layer-heading">Layers <span id="object-count">0</span></div><select id="object-filter" aria-label="Filter page objects"><option value="all">All images &amp; artwork</option><option value="image">Images</option><option value="vector">Vectors</option><option value="background">Backgrounds</option><option value="artwork">Grouped artwork</option></select><div id="object-list" aria-label="Page object layers"></div><p class="small">Frontmost layers first. Text does not flow around objects.</p></div></div>
+<div id="find-options" hidden>
+<label for="find-target">Find by</label><select id="find-target"><option value="text">Exact text</option><option value="area">Draw an area</option></select>
+<div id="find-text-options"><label for="find-query">Text to find</label><input id="find-query" type="text" maxlength="500" placeholder="Name, account number, address…" autocomplete="off">
+<label for="find-scope">Search in</label><select id="find-scope"><option value="all">Whole document</option><option value="page">Current page</option></select>
+<label class="check-label"><input id="find-case" type="checkbox" checked> Match case</label><button id="find-matches" class="full">Find matches</button>
+<p id="find-summary" class="small" role="status">Find exact text to preview the matches.</p><div id="find-results" aria-label="Search matches"></div></div>
+<label for="find-operation">Action</label><select id="find-operation"><option value="blackout">Blackout sensitive information</option><option value="remove">Remove sensitive information</option><option value="replace">Replace text</option></select>
+<div id="find-replacement-options" hidden><label for="find-replacement">Replace with</label><input id="find-replacement" type="text" maxlength="500" autocomplete="off"><p class="small">Replacements fit in the original space. Use the text editor for larger changes.</p></div>
+<p id="redaction-explanation" class="tool-notice">Secure removal rebuilds every page as an image. Existing text will no longer be selectable. Hidden data, metadata, links, and attachments are discarded. Undo and your original file retain the previous content.</p>
+<button id="apply-find" class="primary full" disabled>Blackout matches</button><p id="area-summary" class="small" role="status" hidden>Drag over sensitive information, then apply.</p>
+</div>
+<div id="signature-options" hidden><div id="signature-preview" hidden><img id="saved-signature" alt="Your saved signature"><p class="small">Click an empty place on the page to add this signature.</p></div>
+<label for="signature-width">Width on page (pt)</label><input id="signature-width" type="number" min="10" max="1000" value="140">
+<button id="choose-signature" class="full">Choose signature image…</button><p class="small">PNG or JPEG · Up to 2 MB</p>
+<label for="signature-name">Or type your name</label><input id="signature-name" type="text" maxlength="100" autocomplete="name"><button id="generate-signature" class="primary full">Create &amp; save signature</button>
+<button id="clear-signature" class="full quiet" hidden>Forget saved signature</button><p class="small">One signature is saved on this computer for reuse. This adds a visual signature.</p></div>
+<div id="date-options" hidden><label for="date-value">Date</label><input id="date-value" type="date"><button id="date-today" class="full">Use today’s date</button>
+<label for="date-format">Format</label><select id="date-format"><option value="dmy">DD.MM.YYYY</option><option value="iso">YYYY-MM-DD</option><option value="dmy_slash">DD/MM/YYYY</option><option value="mdy_slash">MM/DD/YYYY</option></select>
+<div class="two-cols"><div><label for="date-size">Text size</label><input id="date-size" type="number" min="4" max="144" value="12"></div><div><label for="date-color">Text color</label><input id="date-color" type="color" value="#242a28"></div></div><p class="small">Click an empty place on the page to insert the date.</p></div>
+<div id="image-options" hidden><label for="image-width">Width on page (pt)</label><input id="image-width" type="number" min="10" max="1000" value="180"><button id="choose-image" class="primary full">Upload image</button><p class="small">PNG or JPEG · Up to 15 MB</p></div>
+<div id="highlight-options" hidden><label for="highlight-color">Highlight color</label><input id="highlight-color" type="color" value="#f4c84b"></div>
+<div id="scan-notice" class="scan-notice" hidden>No selectable text on this page.</div></div></aside>
 </main>
-<input id="file-input" type="file" accept="application/pdf,.pdf" hidden><input id="image-input" type="file" accept="image/png,image/jpeg" hidden>
-<div id="toast" role="status" aria-live="polite" hidden></div><div id="drop-overlay" hidden><div>Drop your PDF here<span>Let’s make those changes.</span></div></div><div id="busy" hidden><span></span><p>Working on your document…</p></div>
-<script src="/objects.js"></script><script src="/app.js"></script></body></html>
+<input id="file-input" type="file" accept="application/pdf,.pdf" hidden><input id="signature-input" type="file" accept="image/png,image/jpeg" hidden><input id="image-input" type="file" accept="image/png,image/jpeg" hidden>
+<div id="toast" role="status" aria-live="polite" hidden></div><div id="drop-overlay" hidden><div>Drop PDF here</div></div><div id="busy" role="status" hidden><span></span><p>Processing…</p></div>
+<script src="/objects.js"></script><script src="/basic-tools.js"></script><script src="/app.js"></script></body></html>

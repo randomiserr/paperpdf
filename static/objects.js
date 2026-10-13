@@ -55,7 +55,7 @@ function drawObjectList(){
     button.setAttribute('aria-pressed',String(objectIds.has(item.id)));button.disabled=!item.editable;
     const icon=document.createElement('span');icon.className='object-icon';icon.textContent=item.kind==='image'?'▧':item.kind==='vector'?'◇':'▦';
     const title=document.createElement('span');title.textContent=item.name;
-    const detail=document.createElement('small');detail.textContent=item.background?'Background':item.kind==='artwork'?'Group':'Editable';
+    const detail=document.createElement('small');detail.textContent=item.background?'Background':item.kind==='artwork'?'Group':'';
     button.append(icon,title,detail);button.title=item.reason||'Shift-click to select more than one object';
     button.onclick=event=>{if(busy)return;event.shiftKey?toggleObject(item.id):selectObjects([item.id]);};
     list.append(button);
@@ -98,18 +98,17 @@ function positionObjectFrame(box){
 async function prepareObjectPreview(){
   const sequence=objectSequence,ids=[...objectIds].join(',');
   try{
-    const preview=new Image(),background=new Image();
+    const preview=new Image();
     preview.src=`/api/object?id=${doc.id}&page=${doc.page}&objects=${encodeURIComponent(ids)}&revision=${doc.revision}&token=${encodeURIComponent(token)}`;
-    background.src=renderURL(doc.page)+'&exclude_objects='+encodeURIComponent(ids);
-    await Promise.all([preview.decode(),background.decode()]);
+    const [background]=await Promise.all([pageRenderer.load(renderURL(doc.page)+'&exclude_objects='+encodeURIComponent(ids)),preview.decode()]);
     if(sequence!==objectSequence||!objectFrame)return;
-    objectFrame.querySelector('.object-preview').src=preview.src;objectFrame.dataset.background=background.src;objectReady=true;
-    if(objectDrag?.moved){$('page-image').src=background.src;objectFrame.classList.add('dragging');}
+    objectFrame.querySelector('.object-preview').src=preview.src;objectFrame.pageBackground=background;objectReady=true;
+    if(objectDrag?.moved||objectFrame.classList.contains('dragging')){pageRenderer.paint(background);objectFrame.classList.add('dragging');}
   }catch(error){if(sequence===objectSequence)notify('Could not prepare this object. Try selecting it again.',true);}
 }
 function fillObjectControls(box=objectBox){
   const items=chosenObjects();if(!items.length)return;
-  $('object-summary').textContent=items.length===1?`${items[0].name} · ${items[0].kind==='artwork'?'internal artwork stays grouped':items[0].kind}`:`${items.length} objects selected`;
+  $('object-summary').textContent=items.length===1?items[0].name:`${items.length} objects`;
   for(const [id,value] of [['object-x',box[0]],['object-y',box[1]],['object-width',box[2]-box[0]],['object-height',box[3]-box[1]]])$(id).value=(Math.round(value*100)/100).toString();
   const vectors=items.every(o=>o.kind==='vector');
   $('object-colors').hidden=!vectors;
@@ -117,7 +116,8 @@ function fillObjectControls(box=objectBox){
   $('object-fill').disabled=!fills.length;$('object-stroke').disabled=!strokes.length;
   if(fills.length)$('object-fill').value=fills[0].fill;
   if(strokes.length)$('object-stroke').value=strokes[0].stroke;
-  $('object-style-note').textContent=items.length===1&&items[0].kind==='artwork'?'Move and resize this group as one piece. Its internal paths and text remain grouped.':vectors?'Color changes apply to selected paths that already have a fill or stroke.':'Move, resize, and arrange these images alongside the other page objects.';
+  const styleNote=items.length===1&&items[0].kind==='artwork'?'This artwork stays grouped.':vectors?'Colors affect existing fills and strokes.':'';
+  $('object-style-note').textContent=styleNote;$('object-style-note').hidden=!styleNote;
 }
 function snapping(box){
   document.querySelectorAll('.snap-guide').forEach(el=>el.remove());
@@ -157,18 +157,22 @@ function moveObjectDrag(event){
     target=[left?anchor[0]-w:anchor[0],top?anchor[1]-h:anchor[1],left?anchor[0]:anchor[0]+w,top?anchor[1]:anchor[1]+h];
   }
   drag.target=target;drag.moved=drag.moved||(Math.abs(dx)+Math.abs(dy))*zoom>3;
-  if(drag.moved){if(objectReady){$('page-image').src=objectFrame.dataset.background;objectFrame.classList.add('dragging');}positionObjectFrame(target);fillObjectControls(target);}
+  if(drag.moved){if(objectReady&&!objectFrame.classList.contains('dragging')){pageRenderer.paint(objectFrame.pageBackground);objectFrame.classList.add('dragging');}positionObjectFrame(target);fillObjectControls(target);}
 }
-function releaseObjectDrag(){
+function releaseObjectDrag(restore=true){
   const drag=objectDrag;if(drag){drag.element.onpointermove=null;drag.element.onpointerup=null;drag.element.onpointercancel=null;
     if(drag.element.hasPointerCapture(drag.pointer))drag.element.releasePointerCapture(drag.pointer);}
   objectDrag=null;document.querySelectorAll('.snap-guide').forEach(el=>el.remove());
-  if(doc)$('page-image').src=renderURL(doc.page);objectFrame?.classList.remove('dragging');return drag;
+  if(restore){if(pageBaseImage)pageRenderer.paint(pageBaseImage);objectFrame?.classList.remove('dragging');}
+  return drag;
 }
 function cancelObjectDrag(){releaseObjectDrag();positionObjectFrame(objectBox);fillObjectControls();}
 async function finishObjectDrag(){
-  const drag=releaseObjectDrag();if(!drag)return;
-  if(drag.moved){if(!await objectMutation('transform',{rect:drag.target})){positionObjectFrame(objectBox);fillObjectControls();}}
+  const drag=releaseObjectDrag(!objectDrag?.moved);if(!drag)return;
+  if(drag.moved){
+    objectFrame?.classList.add('dragging');
+    if(!await objectMutation('transform',{rect:drag.target})){if(pageBaseImage)pageRenderer.paint(pageBaseImage);objectFrame?.classList.remove('dragging');positionObjectFrame(objectBox);fillObjectControls();}
+  }
 }
 async function objectMutation(operation,extra={}){
   if(busy||!objectIds.size)return false;
